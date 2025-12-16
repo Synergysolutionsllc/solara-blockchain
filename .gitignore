@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.log
+.pm2/
+/solara-core/
+*.backup
+*-BACKUP-*
+.DS_Store
