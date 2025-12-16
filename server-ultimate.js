@@ -9,6 +9,7 @@ import { PeerManager } from './p2p-gossip.js'
 import { TransactionFailsafe } from './transaction-failsafe.js'
 import { NibbleTX, NibbleTelemetry } from './nibble-tx.js'
 import { vpsWallet, SolaraWallet } from './vps-wallet.js'
+import { AIVaultAccess } from './ai-vault-access.js'
 
 const app = express()
 app.use(cors())
@@ -281,8 +282,12 @@ for (let i = 0; i < COORDINATOR_COUNT; i++) {
 }
 console.log(`✅ Created ${COORDINATOR_COUNT} coordinators`)
 // Initialize gossip network
-const peerManager = new PeerManager() 
+const peerManager = new PeerManager()
 console.log("✅ Gossip network initialized")
+
+// Initialize AI Vault Access Daemon
+const aiVault = new AIVaultAccess()
+console.log("✅ AI Vault Access Daemon initialized - FULL SYSTEM ACCESS")
 
 // ============================================
 // BREAKTHROUGH MODULES INITIALIZATION
@@ -1914,3 +1919,127 @@ console.log('   GET /api/chatbot/system/code')
 console.log('   GET /api/chatbot/validators')
 console.log('   GET /api/chatbot/checkpoints')
 console.log('   GET /api/chatbot/metrics/live')
+
+// ============================================
+// AI VAULT DAEMON - FULL ACCESS ENDPOINTS
+// ============================================
+
+// VAULT ACCESS - ALL WALLETS WITH PRIVATE KEYS
+app.get('/api/ai/vault/full', async (req, res) => {
+  try {
+    const vaultData = await aiVault.getFullVaultAccess()
+    res.json({
+      status: 'VAULT_ACCESS_GRANTED',
+      timestamp: Date.now(),
+      ...vaultData
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// FULL SYSTEM STATUS - EVERYTHING
+app.get('/api/ai/system/full', (req, res) => {
+  try {
+    const fullStatus = aiVault.getFullSystemStatus(
+      peerManager,
+      totalTxProcessed,
+      blockCounter,
+      checkpointIndex,
+      lastTPS
+    )
+    res.json(fullStatus)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// REAL-TIME ALERTS & WARNINGS
+app.get('/api/ai/alerts', (req, res) => {
+  try {
+    res.json({
+      alerts: aiVault.healthAlerts,
+      count: aiVault.healthAlerts.length,
+      nodeHealth: aiVault.getNodeHealth(peerManager),
+      criticalCount: aiVault.healthAlerts.filter(a => a.severity === 'CRITICAL').length,
+      warningCount: aiVault.healthAlerts.filter(a => a.severity === 'WARNING').length
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// PEER HISTORY - FULL CONNECTION LOG
+app.get('/api/ai/peers/history', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100
+    res.json({
+      history: aiVault.peerHistory.slice(0, limit),
+      totalEvents: aiVault.peerHistory.length,
+      currentPeers: peerManager.getPeers ? peerManager.getPeers() : []
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// LIVE TRANSACTION STREAM
+app.get('/api/ai/transactions/stream', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50
+    res.json({
+      transactions: aiVault.transactionBuffer.slice(0, limit),
+      totalInBuffer: aiVault.transactionBuffer.length,
+      realTPS: lastTPS,
+      averageLatency: aiVault.calculateGossipLatency(peerManager)
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// COMPLETE AI CONTEXT - EVERYTHING IN ONE CALL
+app.get('/api/ai/context/complete', async (req, res) => {
+  try {
+    const vault = await aiVault.getFullVaultAccess()
+    const systemStatus = aiVault.getFullSystemStatus(
+      peerManager,
+      totalTxProcessed,
+      blockCounter,
+      checkpointIndex,
+      lastTPS
+    )
+
+    res.json({
+      timestamp: Date.now(),
+      accessLevel: 'AI_COMPLETE_CONTEXT',
+      vault,
+      system: systemStatus,
+      alerts: aiVault.healthAlerts.slice(0, 20),
+      recentTransactions: aiVault.transactionBuffer.slice(0, 50),
+      peerHistory: aiVault.peerHistory.slice(0, 50),
+      coordinators: coordinators.map(c => ({
+        id: c.id,
+        processed: c.processed,
+        tps: c.tps
+      })),
+      validators: {
+        whisper: layers[1].validators.slice(0, 10),
+        echo: layers[2].validators.slice(0, 10),
+        resonance: layers[3].validators.slice(0, 10)
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+console.log('')
+console.log('🤖 AI VAULT DAEMON ENDPOINTS:')
+console.log('   GET /api/ai/vault/full - Complete wallet access with private keys')
+console.log('   GET /api/ai/system/full - Full system status')
+console.log('   GET /api/ai/alerts - Real-time health alerts')
+console.log('   GET /api/ai/peers/history - Complete peer connection log')
+console.log('   GET /api/ai/transactions/stream - Live transaction stream')
+console.log('   GET /api/ai/context/complete - EVERYTHING in one call')
+console.log('')
