@@ -10,6 +10,7 @@ import { TransactionFailsafe } from './transaction-failsafe.js'
 import { NibbleTX, NibbleTelemetry } from './nibble-tx.js'
 import { vpsWallet, SolaraWallet } from './vps-wallet.js'
 import { AIVaultAccess } from './ai-vault-access.js'
+import { AIRealtimeAlerts } from './ai-realtime-alerts.js'
 
 const app = express()
 app.use(cors())
@@ -288,6 +289,11 @@ console.log("✅ Gossip network initialized")
 // Initialize AI Vault Access Daemon
 const aiVault = new AIVaultAccess()
 console.log("✅ AI Vault Access Daemon initialized - FULL SYSTEM ACCESS")
+
+// Initialize AI Real-Time Alert System (0.23ms interval learning)
+const aiAlerts = new AIRealtimeAlerts(aiVault, peerManager, 8002)
+aiAlerts.start()
+console.log("✅ AI Real-Time Alerts initialized - Auto-push notifications ACTIVE")
 
 // ============================================
 // BREAKTHROUGH MODULES INITIALIZATION
@@ -636,6 +642,30 @@ app.get('/api/transaction/:hash', (req, res) => {
 // Create transaction
 app.post('/api/transaction', (req, res) => {
   const tx = createTransaction(req.body)
+
+  // AI Alert: New transaction detected
+  if (aiAlerts) {
+    aiAlerts.sendAlert('INFO', 'TRANSACTION_CREATED',
+      `New transaction: ${tx.from?.substring(0, 8)}... → ${tx.to?.substring(0, 8)}... (${tx.amount} SOLR)`,
+      {
+        hash: tx.hash,
+        from: tx.from,
+        to: tx.to,
+        amount: tx.amount,
+        layer: tx.layer,
+        validator: tx.validator
+      }
+    )
+
+    // Track in AI Vault
+    if (aiVault && aiVault.transactionBuffer) {
+      aiVault.transactionBuffer.unshift(tx)
+      if (aiVault.transactionBuffer.length > aiVault.maxBufferSize) {
+        aiVault.transactionBuffer.pop()
+      }
+    }
+  }
+
   res.json({ transaction: tx })
 })
 
