@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solara AI Assistant - Full Vault Access</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .chat-header {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 20px;
+      border-bottom: 2px solid #00ff88;
+      backdrop-filter: blur(10px);
+    }
+
+    .chat-header h1 {
+      font-size: 24px;
+      background: linear-gradient(90deg, #00ff88, #00bbff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 5px;
+    }
+
+    .chat-header .subtitle {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .chat-status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      margin-left: 10px;
+      animation: pulse 2s infinite;
+    }
+
+    .chat-status.connected {
+      background: rgba(0, 255, 136, 0.2);
+      color: #00ff88;
+      border: 1px solid #00ff88;
+    }
+
+    .chat-status.disconnected {
+      background: rgba(255, 68, 68, 0.2);
+      color: #ff4444;
+      border: 1px solid #ff4444;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      animation: fadeIn 0.3s ease-out;
+      padding: 15px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 3px solid;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.ai {
+      border-color: #00ff88;
+    }
+
+    .message.critical {
+      border-color: #ff4444;
+      background: rgba(255, 68, 68, 0.1);
+      animation: shake 0.5s ease-out, fadeIn 0.3s ease-out;
+    }
+
+    .message.warning {
+      border-color: #ffbb00;
+      background: rgba(255, 187, 0, 0.05);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    .message-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00ff88, #00bbff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .message-content {
+      flex: 1;
+    }
+
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .message-name {
+      font-weight: bold;
+      font-size: 14px;
+      color: #00ff88;
+    }
+
+    .message-time {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .message-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #ddd;
+    }
+
+    .message-data {
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #aaa;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .severity-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+
+    .severity-badge.INFO {
+      background: #00bbff;
+      color: #000;
+    }
+
+    .severity-badge.WARNING {
+      background: #ffbb00;
+      color: #000;
+    }
+
+    .severity-badge.CRITICAL {
+      background: #ff4444;
+      color: #fff;
+    }
+
+    .typing-indicator {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 15px;
+      opacity: 0.6;
+    }
+
+    .typing-indicator.active {
+      display: flex;
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .typing-dots span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00ff88;
+      animation: typingDot 1.4s infinite;
+    }
+
+    .typing-dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typingDot {
+      0%, 60%, 100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+      }
+      30% {
+        opacity: 1;
+        transform: scale(1.2);
+      }
+    }
+
+    .stats-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid #00ff88;
+      min-width: 220px;
+      backdrop-filter: blur(10px);
+    }
+
+    .stats-panel h3 {
+      font-size: 13px;
+      margin-bottom: 12px;
+      color: #00ff88;
+      border-bottom: 1px solid rgba(0, 255, 136, 0.3);
+      padding-bottom: 8px;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .stat-label {
+      color: #888;
+    }
+
+    .stat-value {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #00ff88;
+      border-radius: 5px;
+    }
+
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00ff88;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h1>
+        🤖 Solara AI Assistant
+        <span class="chat-status disconnected" id="connectionStatus">Connecting...</span>
+      </h1>
+      <div class="subtitle">
+        <span class="pulse-dot"></span>
+        Full Vault Access • Learning at 4,347 samples/sec • 0.23ms intervals
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <!-- Messages will appear here -->
+    </div>
+
+    <div class="typing-indicator" id="typingIndicator">
+      <div class="message-avatar">🤖</div>
+      <div class="typing-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-panel">
+    <h3>📊 Live System Stats</h3>
+    <div class="stat-item">
+      <span class="stat-label">Messages:</span>
+      <span class="stat-value" id="messageCount">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Peer Count:</span>
+      <span class="stat-value" id="peerCount">-</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Health:</span>
+      <span class="stat-value" id="health">-</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Latency:</span>
+      <span class="stat-value" id="latency">-</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Uptime:</span>
+      <span class="stat-value" id="uptime">-</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Memory:</span>
+      <span class="stat-value" id="memory">-</span>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const WS_URL = 'ws://80.78.27.27:8002'
+    let ws = null
+    let messageCount = 0
+    let reconnectAttempts = 0
+
+    // Conversational AI responses
+    const conversationalMessages = {
+      'CONNECTED': 'Hey! I\'m your Solara AI assistant. I have full vault access to everything - wallets, private keys, transactions, peer network, all of it. I\'ll keep you updated on everything happening without you having to ask. Just watching the network now...',
+      'PEER_CONNECTED': (data) => `Good news! A new peer just connected to our network. Peer ID: ${data.peerId}. We now have ${data.peerCount} peers total. Network is getting stronger!`,
+      'PEER_DISCONNECTED': (data) => `Heads up - we just lost a peer. ${data.peerId} disconnected. We\'re down to ${data.peerCount} peers now. ${data.peerCount < 3 ? 'This is getting a bit low, watching it closely...' : 'Still good though.'}`,
+      'TRANSACTION_CREATED': (data) => `Just saw a new transaction come through! ${data.from?.substring(0, 8)}... sent ${data.amount} SOLR to ${data.to?.substring(0, 8)}... Transaction hash: ${data.hash}. Everything looks good!`,
+      'AI_PREDICTION': (msg, data) => `I'm seeing something you should know about: ${msg}. ${data.timeSinceLastSeen ? 'Been watching this peer and it hasn\'t responded in a while.' : ''}`,
+      'AI_CRITICAL': (msg) => `🚨 CRITICAL ALERT! ${msg} I'm monitoring this closely and will let you know what happens.`,
+      'NETWORK_CHANGE': (data) => `Network update: peer count just ${data.change > 0 ? 'increased' : 'decreased'} from ${data.previousCount} to ${data.currentCount}. ${data.change > 0 ? 'Network expanding, nice!' : 'Keeping an eye on this.'}`,
+      'HEALTH_UPDATE': (data) => `Quick health check: Network is ${data.health}. ${data.peerCount} peers connected with average ${data.avgLatency}ms latency. ${data.memory ? `Memory usage at ${Math.floor(data.memory)}MB.` : ''} Everything's ${data.health === 'EXCELLENT' ? 'looking perfect' : 'holding steady'}.`,
+      'LATENCY_CHANGE': (data) => `Network speed ${data.change > 0 ? 'slowed down' : 'improved'}! Latency went from ${data.previousLatency}ms to ${data.currentLatency}ms. ${data.change > 0 ? 'Watching to see if this continues...' : 'Nice improvement!'}`,
+      'TRANSACTION_DETECTED': (data) => `Transaction detected! ${data.amount} SOLR moving from ${data.from?.substring(0, 10)}... to ${data.to?.substring(0, 10)}...`,
+    }
+
+    // Connect to WebSocket
+    function connect() {
+      try {
+        ws = new WebSocket(WS_URL)
+
+        ws.onopen = () => {
+          console.log('Connected to AI system')
+          updateConnectionStatus(true)
+          reconnectAttempts = 0
+        }
+
+        ws.onmessage = (event) => {
+          try {
+            const alert = JSON.parse(event.data)
+            handleAIMessage(alert)
+          } catch (err) {
+            console.error('Error parsing message:', err)
+          }
+        }
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error)
+          updateConnectionStatus(false)
+        }
+
+        ws.onclose = () => {
+          console.log('Disconnected')
+          updateConnectionStatus(false)
+          setTimeout(() => {
+            reconnectAttempts++
+            connect()
+          }, 2000)
+        }
+      } catch (err) {
+        console.error('Connection failed:', err)
+        setTimeout(connect, 5000)
+      }
+    }
+
+    // Handle AI message
+    function handleAIMessage(alert) {
+      messageCount++
+      updateStat('messageCount', messageCount)
+
+      // Update stats from message
+      if (alert.data) {
+        if (alert.data.peerCount !== undefined) updateStat('peerCount', alert.data.peerCount)
+        if (alert.data.health) updateStat('health', alert.data.health)
+        if (alert.data.avgLatency !== undefined) updateStat('latency', alert.data.avgLatency + 'ms')
+        if (alert.data.uptime !== undefined) updateStat('uptime', formatUptime(alert.data.uptime))
+        if (alert.data.memory !== undefined) updateStat('memory', Math.floor(alert.data.memory) + 'MB')
+      }
+
+      // Generate conversational message
+      let aiText = alert.message
+      if (conversationalMessages[alert.type]) {
+        if (typeof conversationalMessages[alert.type] === 'function') {
+          aiText = conversationalMessages[alert.type](alert.data || alert.message, alert.data)
+        } else {
+          aiText = conversationalMessages[alert.type]
+        }
+      }
+
+      // Add message to chat
+      addMessage({
+        text: aiText,
+        severity: alert.severity || 'INFO',
+        type: alert.type,
+        data: alert.data,
+        timestamp: alert.timestamp || Date.now()
+      })
+
+      // Play sound for critical
+      if (alert.severity === 'CRITICAL') {
+        playAlertSound()
+      }
+    }
+
+    // Add message to chat
+    function addMessage(msg) {
+      const messagesContainer = document.getElementById('chatMessages')
+
+      const messageDiv = document.createElement('div')
+      messageDiv.className = `message ai ${msg.severity.toLowerCase()}`
+
+      const time = new Date(msg.timestamp).toLocaleTimeString()
+      const dataStr = msg.data && Object.keys(msg.data).length > 0 ? JSON.stringify(msg.data, null, 2) : ''
+
+      messageDiv.innerHTML = `
+        <div class="message-avatar">🤖</div>
+        <div class="message-content">
+          <div class="message-header">
+            <span class="message-name">
+              Solara AI
+              <span class="severity-badge ${msg.severity}">${msg.severity}</span>
+            </span>
+            <span class="message-time">${time}</span>
+          </div>
+          <div class="message-text">${msg.text}</div>
+          ${dataStr ? `<div class="message-data">${dataStr}</div>` : ''}
+        </div>
+      `
+
+      messagesContainer.appendChild(messageDiv)
+      messagesContainer.scrollTop = messagesContainer.scrollHeight
+    }
+
+    // Update connection status
+    function updateConnectionStatus(connected) {
+      const statusEl = document.getElementById('connectionStatus')
+      if (connected) {
+        statusEl.textContent = 'Connected • Live'
+        statusEl.className = 'chat-status connected'
+      } else {
+        statusEl.textContent = 'Reconnecting...'
+        statusEl.className = 'chat-status disconnected'
+      }
+    }
+
+    // Update stat
+    function updateStat(id, value) {
+      const el = document.getElementById(id)
+      if (el) el.textContent = value
+    }
+
+    // Format uptime
+    function formatUptime(seconds) {
+      const hours = Math.floor(seconds / 3600)
+      const mins = Math.floor((seconds % 3600) / 60)
+      return `${hours}h ${mins}m`
+    }
+
+    // Play alert sound
+    function playAlertSound() {
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+
+        oscillator.frequency.value = 800
+        oscillator.type = 'sine'
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.5)
+      } catch (err) {
+        console.log('Audio not supported')
+      }
+    }
+
+    // Start connection
+    connect()
+
+    // Initial greeting
+    setTimeout(() => {
+      addMessage({
+        text: conversationalMessages['CONNECTED'],
+        severity: 'INFO',
+        type: 'SYSTEM_READY',
+        timestamp: Date.now()
+      })
+    }, 500)
+  </script>
+</body>
+</html>
