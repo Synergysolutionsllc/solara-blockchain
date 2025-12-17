@@ -367,6 +367,33 @@
     let ws = null
     let messageCount = 0
     let reconnectAttempts = 0
+    const CHAT_STORAGE_KEY = 'solara_ai_chat_history'
+
+    // Save message to localStorage - PERSISTENT FOREVER
+    function saveMessageToStorage(msg) {
+      try {
+        let messages = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]')
+        messages.push(msg)
+        // Keep UNLIMITED conversation history - NEVER DELETE
+        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages))
+      } catch (err) {
+        console.error('localStorage save failed:', err)
+      }
+    }
+
+    // Load all messages from localStorage on startup
+    function loadMessagesFromStorage() {
+      try {
+        const messages = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]')
+        messages.forEach(msg => {
+          addMessage(msg, false) // false = don't save again
+        })
+        console.log(`Loaded ${messages.length} persisted messages from chat history`)
+        messageCount = messages.length
+      } catch (err) {
+        console.error('localStorage load failed:', err)
+      }
+    }
 
     // Conversational AI responses
     const conversationalMessages = {

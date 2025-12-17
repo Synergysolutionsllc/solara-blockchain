@@ -250,7 +250,32 @@
     let ws = null
     let alertCount = 0
     let reconnectAttempts = 0
-    const MAX_ALERTS_DISPLAY = 100
+    const STORAGE_KEY = 'solara_ai_alerts_history'
+
+    // Save alert to localStorage - PERSISTENT FOREVER
+    function saveAlertToStorage(alert) {
+      try {
+        let alerts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+        alerts.unshift(alert)
+        // Keep unlimited history
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts))
+      } catch (err) {
+        console.error('localStorage save failed:', err)
+      }
+    }
+
+    // Load all alerts from localStorage on startup
+    function loadAlertsFromStorage() {
+      try {
+        const alerts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+        alerts.forEach(alert => {
+          handleAlert(alert, false) // false = don't save again
+        })
+        console.log(`Loaded ${alerts.length} persisted alerts from history`)
+      } catch (err) {
+        console.error('localStorage load failed:', err)
+      }
+    }
 
     // Connect to WebSocket
     function connect() {
@@ -297,7 +322,7 @@
     }
 
     // Handle incoming alert
-    function handleAlert(alert) {
+    function handleAlert(alert, shouldSave = true) {
       alertCount++
       updateStat('alertCount', alertCount)
 
@@ -338,9 +363,10 @@
       const container = document.getElementById('alertsContainer')
       container.insertBefore(alertDiv, container.firstChild)
 
-      // Remove old alerts if too many
-      while (container.children.length > MAX_ALERTS_DISPLAY) {
-        container.removeChild(container.lastChild)
+      // NEVER REMOVE ALERTS - KEEP ALL MESSAGES PERSISTENT
+      // Store in localStorage for persistence across sessions
+      if (shouldSave) {
+        saveAlertToStorage(alert)
       }
 
       // Play sound for critical alerts
@@ -388,6 +414,9 @@
         console.log('Audio not supported')
       }
     }
+
+    // Load ALL persisted messages from localStorage first
+    loadAlertsFromStorage()
 
     // Start connection
     connect()

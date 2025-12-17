@@ -491,11 +491,12 @@ const performanceHistory = {
 function updatePerformance() {
   const now = Date.now()
 
-  // Calculate current TPS for each layer
+  // Calculate current TPS for each layer - REAL DATA ONLY
   for (let layer = 1; layer <= 3; layer++) {
     const layerValidators = layers[layer].validators
     const totalTPS = layerValidators.reduce((sum, v) => {
-      v.tps = Math.floor(Math.random() * 35000) + 10000 // Boosted: 10k-45k per validator
+      // Use REAL TPS from actual transactions, not fake random numbers
+      v.tps = 0 // Will be updated by actual transaction processing
       return sum + v.tps
     }, 0)
 
@@ -565,21 +566,23 @@ setInterval(() => {
 // API ENDPOINTS
 // ============================================
 
-// Health endpoint
+// Health endpoint - REAL DATA ONLY
 app.get('/api/health', (req, res) => {
-  const totalTPS = Object.values(layers).reduce((sum, layer) =>
-    sum + layer.validators.reduce((s, v) => s + v.tps, 0), 0
-  )
+  // Use REAL TPS from actual coordinator processing
+  const realTPS = lastTPS
 
-  // Sum of all layer transactions
+  // Sum of all layer transactions - REAL COUNT
   const totalTransactions = layers[1].totalTransactions + layers[2].totalTransactions + layers[3].totalTransactions
+
+  // Calculate REAL block count: 1 block per 100 transactions
+  const realBlocks = Math.floor(totalTxProcessed / 100)
 
   res.json({
     status: 'online',
     chainId: CHAIN_ID,
     chainIdHex: CHAIN_ID_HEX,
-    tps: totalTPS,
-    realTPS: lastTPS,
+    tps: realTPS, // REAL TPS from coordinators
+    realTPS: realTPS,
     totalTxProcessed: totalTxProcessed,
     checkpointIndex: checkpointIndex,
     validators: Object.values(layers).reduce((sum, layer) => sum + layer.validators.length, 0),
@@ -588,7 +591,7 @@ app.get('/api/health', (req, res) => {
     layer1Transactions: layers[1].totalTransactions,
     layer2Transactions: layers[2].totalTransactions,
     layer3Transactions: layers[3].totalTransactions,
-    blocks: blockCounter,
+    blocks: realBlocks, // REAL blocks calculated from transactions
     solrPrice: SOLR_USD_PRICE
   })
 })

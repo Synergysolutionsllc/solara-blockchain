@@ -71,7 +71,72 @@ class AIVaultAccess extends EventEmitter {
       }
     } catch (err) {}
 
+    // ALL SOURCE CODE FILES - COMPLETE ACCESS
+    vault.sourceCode = await this.getAllSourceCode()
+
     return vault
+  }
+
+  // GET ALL SOURCE CODE - MMN, GOSSIP, FAILSAFE, EVERYTHING
+  async getAllSourceCode() {
+    const codeFiles = {
+      timestamp: Date.now(),
+      accessLevel: 'FULL_CODE_ACCESS',
+      files: []
+    }
+
+    // List of all source files to read
+    const filesToRead = [
+      'server-ultimate.js',
+      'nibble-tx.js',
+      'p2p-gossip.js',
+      'transaction-failsafe.js',
+      'vps-wallet.js',
+      'ai-vault-access.js',
+      'ai-realtime-alerts.js',
+      'package.json'
+    ]
+
+    for (const fileName of filesToRead) {
+      try {
+        if (fs.existsSync(fileName)) {
+          const content = fs.readFileSync(fileName, 'utf8')
+          const stats = fs.statSync(fileName)
+          codeFiles.files.push({
+            name: fileName,
+            contents: content,
+            lines: content.split('\n').length,
+            size: stats.size,
+            sizeKB: (stats.size / 1024).toFixed(2),
+            modified: stats.mtime,
+            purpose: this.getFilePurpose(fileName)
+          })
+        }
+      } catch (err) {
+        codeFiles.files.push({
+          name: fileName,
+          status: 'NOT_FOUND',
+          error: err.message
+        })
+      }
+    }
+
+    return codeFiles
+  }
+
+  // Describe what each file does
+  getFilePurpose(fileName) {
+    const purposes = {
+      'server-ultimate.js': 'Main backend server - 3-layer validator system, coordinators, API endpoints, full blockchain logic',
+      'nibble-tx.js': 'MMN (MyMothersNibble) - Binary transaction compression (92-95% storage reduction, 40 bytes/tx)',
+      'p2p-gossip.js': 'P2P Gossip Network - WebSocket mesh networking, sub-50ms sync, automatic peer discovery',
+      'transaction-failsafe.js': '99.9% transaction success guarantee - automatic retries, validator acknowledgment tracking',
+      'vps-wallet.js': 'VPS Master Wallet - Zero-fee Solana keypair transactions for checkpoint payments',
+      'ai-vault-access.js': 'AI Vault Daemon - Full system access including private keys, real-time monitoring',
+      'ai-realtime-alerts.js': 'AI Real-Time Alerts - 0.23ms learning intervals, auto-push notifications, predictive warnings',
+      'package.json': 'Node.js dependencies and project configuration'
+    }
+    return purposes[fileName] || 'System file'
   }
 
   // REAL-TIME TRANSACTION STREAM WITH NOTIFICATIONS
