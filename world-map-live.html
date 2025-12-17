@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solara Global Network - Live Transaction Map</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    #map-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      background: radial-gradient(ellipse at center, #0a0e27 0%, #000000 100%);
+    }
+
+    #world-map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .node-marker {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #00ff88;
+      border: 2px solid rgba(0, 255, 136, 0.5);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      animation: pulse 2s infinite;
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+      cursor: pointer;
+      z-index: 100;
+    }
+
+    .node-marker.active {
+      background: #00bbff;
+      border-color: rgba(0, 187, 255, 0.5);
+      box-shadow: 0 0 30px rgba(0, 187, 255, 1);
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.3);
+        opacity: 0.7;
+      }
+    }
+
+    .node-label {
+      position: absolute;
+      transform: translate(-50%, -30px);
+      background: rgba(0, 0, 0, 0.8);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 101;
+      border: 1px solid #00ff88;
+    }
+
+    .transaction-beam {
+      position: absolute;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00ff88, transparent);
+      transform-origin: left center;
+      pointer-events: none;
+      z-index: 50;
+      animation: beamFly 1.5s ease-out forwards;
+      box-shadow: 0 0 10px #00ff88;
+    }
+
+    @keyframes beamFly {
+      0% {
+        opacity: 0;
+        transform: scaleX(0);
+      }
+      20% {
+        opacity: 1;
+      }
+      80% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: scaleX(1);
+      }
+    }
+
+    .stats-overlay {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 20px;
+      border-radius: 10px;
+      border: 2px solid #00ff88;
+      backdrop-filter: blur(10px);
+      z-index: 200;
+      min-width: 280px;
+    }
+
+    .stats-overlay h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      background: linear-gradient(90deg, #00ff88, #00bbff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .stat-label {
+      color: #888;
+    }
+
+    .stat-value {
+      color: #00ff88;
+      font-weight: bold;
+    }
+
+    .legend {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #00ff88;
+      z-index: 200;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 10px;
+      margin-right: 10px;
+      border-radius: 2px;
+    }
+
+    .title-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 300;
+      pointer-events: none;
+      opacity: 0;
+      animation: fadeInOut 4s ease-in-out;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+      20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      80% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    .title-overlay h1 {
+      font-size: 48px;
+      background: linear-gradient(90deg, #00ff88, #00bbff, #ff00ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 40px rgba(0, 255, 136, 0.5);
+    }
+
+    .connection-line {
+      position: absolute;
+      height: 1px;
+      background: rgba(0, 255, 136, 0.2);
+      transform-origin: left center;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <canvas id="worldCanvas"></canvas>
+    <div id="nodes"></div>
+    <div id="beams"></div>
+  </div>
+
+  <div class="title-overlay">
+    <h1>SOLARA GLOBAL NETWORK</h1>
+    <p style="font-size: 20px; color: #00ff88; margin-top: 10px;">Real-Time Transaction Visualization</p>
+  </div>
+
+  <div class="stats-overlay">
+    <h2>🌍 Network Statistics</h2>
+    <div class="stat-row">
+      <span class="stat-label">Active Nodes:</span>
+      <span class="stat-value" id="nodeCount">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Transactions:</span>
+      <span class="stat-value" id="txCount">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Network TPS:</span>
+      <span class="stat-value" id="tps">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Countries:</span>
+      <span class="stat-value" id="countries">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Global Coverage:</span>
+      <span class="stat-value" id="coverage">0%</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-color" style="background: #00ff88;"></div>
+      <span>Active Node</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #00bbff;"></div>
+      <span>Your Node</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: linear-gradient(90deg, transparent, #00ff88, transparent);"></div>
+      <span>Transaction Flow</span>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://80.78.27.27:5001'
+    const WS_URL = 'ws://80.78.27.27:8002'
+
+    let nodes = []
+    let transactions = []
+    let canvas, ctx
+    let ws = null
+
+    // Known node locations (will be populated from API + IP geolocation)
+    const knownNodes = {
+      '80.78.27.27': { lat: 51.5074, lon: -0.1278, name: 'VPS-1 London', country: 'UK' },
+      '62.171.153.214': { lat: 50.1109, lon: 8.6821, name: 'VPS-3 Frankfurt', country: 'Germany' },
+      '80.78.23.3': { lat: 52.5200, lon: 13.4050, name: 'SLR-03 Berlin', country: 'Germany' },
+      '100.121.61.79': { lat: 51.5074, lon: -0.1278, name: 'Tailscale Node 1', country: 'UK' },
+      '100.126.204.82': { lat: 50.1109, lon: 8.6821, name: 'Tailscale Master', country: 'Germany' },
+      '100.110.254.80': { lat: 48.8566, lon: 2.3522, name: 'Tailscale Node 2', country: 'France' },
+      '100.66.202.125': { lat: 52.5200, lon: 13.4050, name: 'GitHub Node', country: 'Germany' }
+    }
+
+    // Initialize
+    function init() {
+      canvas = document.getElementById('worldCanvas')
+      ctx = canvas.getContext('2d')
+
+      resizeCanvas()
+      window.addEventListener('resize', resizeCanvas)
+
+      drawWorldMap()
+      fetchNodes()
+      connectWebSocket()
+
+      // Update stats periodically
+      setInterval(updateStats, 2000)
+
+      // Simulate transactions for demo
+      setInterval(simulateTransaction, 3000)
+    }
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+      drawWorldMap()
+      redrawNodes()
+    }
+
+    function drawWorldMap() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      // Draw grid
+      ctx.strokeStyle = 'rgba(0, 255, 136, 0.1)'
+      ctx.lineWidth = 0.5
+
+      // Latitude lines
+      for (let lat = -90; lat <= 90; lat += 15) {
+        const y = latToY(lat)
+        ctx.beginPath()
+        ctx.moveTo(0, y)
+        ctx.lineTo(canvas.width, y)
+        ctx.stroke()
+      }
+
+      // Longitude lines
+      for (let lon = -180; lon <= 180; lon += 30) {
+        const x = lonToX(lon)
+        ctx.beginPath()
+        ctx.moveTo(x, 0)
+        ctx.lineTo(x, canvas.height)
+        ctx.stroke()
+      }
+
+      // Draw continents outline (simplified)
+      drawContinents()
+    }
+
+    function drawContinents() {
+      ctx.strokeStyle = 'rgba(0, 255, 136, 0.3)'
+      ctx.lineWidth = 1.5
+      ctx.fillStyle = 'rgba(0, 255, 136, 0.05)'
+
+      // Simplified world map paths
+      const continents = [
+        // North America
+        { lats: [70, 50, 30, 20, 15, 25, 40, 60, 70], lons: [-170, -130, -115, -100, -80, -80, -70, -70, -170] },
+        // Europe
+        { lats: [70, 60, 45, 35, 40, 55, 70], lons: [-10, 0, 10, 10, 30, 30, 30] },
+        // Africa
+        { lats: [35, 15, -35, -35, 15, 35], lons: [-10, 20, 30, 15, 10, 10] },
+        // Asia
+        { lats: [70, 50, 20, 0, 20, 40, 70], lons: [40, 70, 100, 110, 150, 150, 180] },
+        // South America
+        { lats: [10, -20, -55, -55, -20, 10], lons: [-80, -70, -75, -65, -35, -35] },
+        // Australia
+        { lats: [-10, -35, -40, -35, -10], lons: [115, 115, 140, 150, 150] }
+      ]
+
+      continents.forEach(continent => {
+        ctx.beginPath()
+        const startX = lonToX(continent.lons[0])
+        const startY = latToY(continent.lats[0])
+        ctx.moveTo(startX, startY)
+
+        for (let i = 1; i < continent.lats.length; i++) {
+          const x = lonToX(continent.lons[i])
+          const y = latToY(continent.lats[i])
+          ctx.lineTo(x, y)
+        }
+
+        ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+      })
+    }
+
+    function latToY(lat) {
+      return canvas.height / 2 - (lat / 90) * (canvas.height / 2)
+    }
+
+    function lonToX(lon) {
+      return canvas.width / 2 + (lon / 180) * (canvas.width / 2)
+    }
+
+    async function fetchNodes() {
+      try {
+        const response = await fetch(`${API_URL}/api/gossip/peers`)
+        const data = await response.json()
+
+        const nodesContainer = document.getElementById('nodes')
+        nodesContainer.innerHTML = ''
+
+        // Add known nodes
+        Object.entries(knownNodes).forEach(([ip, location]) => {
+          addNodeMarker(ip, location)
+        })
+
+        // Add discovered peers
+        if (data.connectedPeers) {
+          data.connectedPeers.forEach(peer => {
+            const peerIP = peer.url.split(':')[0]
+            if (!knownNodes[peerIP]) {
+              // Random location for unknown peers
+              addNodeMarker(peerIP, {
+                lat: (Math.random() * 160) - 80,
+                lon: (Math.random() * 350) - 175,
+                name: `Node ${peerIP.substring(0, 10)}...`,
+                country: 'Unknown'
+              })
+            }
+          })
+        }
+
+        drawConnectionLines()
+        updateStats()
+      } catch (err) {
+        console.error('Error fetching nodes:', err)
+      }
+    }
+
+    function addNodeMarker(ip, location) {
+      const x = lonToX(location.lon)
+      const y = latToY(location.lat)
+
+      const marker = document.createElement('div')
+      marker.className = 'node-marker'
+      marker.style.left = x + 'px'
+      marker.style.top = y + 'px'
+      marker.dataset.ip = ip
+      marker.dataset.lat = location.lat
+      marker.dataset.lon = location.lon
+
+      const label = document.createElement('div')
+      label.className = 'node-label'
+      label.textContent = location.name
+      label.style.left = x + 'px'
+      label.style.top = y + 'px'
+
+      marker.addEventListener('mouseenter', () => {
+        marker.classList.add('active')
+      })
+
+      marker.addEventListener('mouseleave', () => {
+        marker.classList.remove('active')
+      })
+
+      document.getElementById('nodes').appendChild(marker)
+      document.getElementById('nodes').appendChild(label)
+
+      nodes.push({ ip, location, marker, x, y })
+    }
+
+    function drawConnectionLines() {
+      // Draw lines between all connected nodes
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const node1 = nodes[i]
+          const node2 = nodes[j]
+
+          const dx = node2.x - node1.x
+          const dy = node2.y - node1.y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI
+
+          const line = document.createElement('div')
+          line.className = 'connection-line'
+          line.style.left = node1.x + 'px'
+          line.style.top = node1.y + 'px'
+          line.style.width = distance + 'px'
+          line.style.transform = `rotate(${angle}deg)`
+
+          document.getElementById('nodes').appendChild(line)
+        }
+      }
+    }
+
+    function redrawNodes() {
+      nodes.forEach(node => {
+        const x = lonToX(node.location.lon)
+        const y = latToY(node.location.lat)
+
+        node.x = x
+        node.y = y
+        node.marker.style.left = x + 'px'
+        node.marker.style.top = y + 'px'
+      })
+    }
+
+    function simulateTransaction() {
+      if (nodes.length < 2) return
+
+      const from = nodes[Math.floor(Math.random() * nodes.length)]
+      const to = nodes[Math.floor(Math.random() * nodes.length)]
+
+      if (from === to) return
+
+      animateTransaction(from, to)
+      transactions.push({ from: from.ip, to: to.ip, timestamp: Date.now() })
+    }
+
+    function animateTransaction(from, to) {
+      const dx = to.x - from.x
+      const dy = to.y - from.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI
+
+      const beam = document.createElement('div')
+      beam.className = 'transaction-beam'
+      beam.style.left = from.x + 'px'
+      beam.style.top = from.y + 'px'
+      beam.style.width = distance + 'px'
+      beam.style.transform = `rotate(${angle}deg)`
+
+      document.getElementById('beams').appendChild(beam)
+
+      setTimeout(() => {
+        beam.remove()
+      }, 1500)
+    }
+
+    function connectWebSocket() {
+      try {
+        ws = new WebSocket(WS_URL)
+
+        ws.onmessage = (event) => {
+          try {
+            const alert = JSON.parse(event.data)
+            if (alert.type === 'TRANSACTION_CREATED' || alert.type === 'TRANSACTION_DETECTED') {
+              // Real transaction detected - animate it!
+              if (nodes.length >= 2) {
+                const from = nodes[Math.floor(Math.random() * nodes.length)]
+                const to = nodes[Math.floor(Math.random() * nodes.length)]
+                animateTransaction(from, to)
+              }
+            }
+          } catch (err) {}
+        }
+      } catch (err) {
+        console.log('WebSocket not available, using simulation mode')
+      }
+    }
+
+    async function updateStats() {
+      try {
+        const response = await fetch(`${API_URL}/api/health`)
+        const data = await response.json()
+
+        document.getElementById('nodeCount').textContent = nodes.length
+        document.getElementById('txCount').textContent = data.totalTxProcessed || 0
+        document.getElementById('tps').textContent = data.realTPS || 0
+
+        const countries = new Set(nodes.map(n => n.location.country).filter(Boolean))
+        document.getElementById('countries').textContent = countries.size
+
+        const coverage = Math.min(100, (nodes.length / 20) * 100).toFixed(0)
+        document.getElementById('coverage').textContent = coverage + '%'
+      } catch (err) {
+        console.error('Error updating stats:', err)
+      }
+    }
+
+    init()
+  </script>
+</body>
+</html>
